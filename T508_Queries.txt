@@ -1,0 +1,448 @@
+﻿QUERIES
+
+
+Group_No:-T508
+Kevin Shingala - 202201465
+Malay Sidapara - 202201488
+Shravan Makwana - 202201492
+Tushar Mori - 202201502
+Arnold Mochahari - 202201522
+
+
+
+
+
+
+
+
+Queries For Lawyers :
+
+
+1. List all the cases of a given lawyer with a particular UID. 
+
+
+select c.* from cases as c join p_lawyer_case as l on c.cnr_no = l.cnr_no 
+        where l.uid = 154258888
+
+
+2. List the criminal history of a person.
+
+
+select c.* from cases as c join respondent as r on c.cnr_no = r.cnr_no 
+        where r.uid = '484344412'
+
+
+3. List all the cases and their judge name of a given lawyer in a given year.
+
+
+(select c.cnr_no, p.name as judge_name, h.date as hearing_dates 
+        from cases as c join p_lawyer_case as l on c.cnr_no = l.cnr_no 
+        join related_people as p on p.uid = c.judge_uid join hearings_cases as h 
+on c.cnr_no = h.cnr_no
+        where l.uid = 110856700 and extract(year from h.date) = 1991 order by
+ h.date)
+union
+(select i.cnr_no, r.name as judge_name, ih.date as hearing_dates 
+        from interstate_cases as i join p_lawyer_intcase as pl on i.cnr_no =
+ pl.cnr_no
+        join hearings_intcases as ih on i.cnr_no = ih.cnr_no
+        join intcase_judges as j on i.cnr_no = j.cnr_no
+        join related_people as r on j.uid = r.uid
+        where pl.uid = '110856700' and extract(year from ih.date)=1991 order by 
+ih.date)
+
+
+4. List all the hearing dates of a given case.
+
+
+select c.cnr_no, h.date as hearing_date from 
+cases as c natural join hearings_cases as h 
+        where c.cnr_no ='344776' order by h.date
+
+
+5. List all the cases and case type that a given lawyer has won in a high court.
+
+
+select c.cnr_no, c.type, c.verdict, c.csr_no from cases as c join r_lawyer_case as
+ l on
+c.cnr_no = l.cnr_no 
+where csr_no like '%00' and l.uid ='757805065' and verdict = 'Innocent'
+
+
+6. List all the crimes done by a particular person.
+
+
+select p.*, c.type from cases as c join respondent as r on r.cnr_no = c.cnr_no 
+        join related_people as p on r.uid = p.uid 
+        where r.uid = '114307155'
+
+
+7. List all the interstate cases with their respective verdicts and the name of lawyers involved. 
+
+
+ SELECT inte.CNR_No, inte.verdict, r.name AS lawyer_name
+FROM interstate_cases inte
+LEFT JOIN p_lawyer_intcase pi ON inte.CNR_No = pi.CNR_No
+LEFT JOIN related_people r ON pi.uid = r.uid;
+
+
+8. All CRIMINALS who have never committed a murder or have been accused of that but are proved innocent.
+
+
+        select distinct name from (respondent natural join related_people) as a 
+join cases as c on c.cnr_no =  a.cnr_no
+                where type != 'Murder' or (type = 'Murder' and verdict = 'Innocent')
+
+
+
+
+
+
+
+
+
+
+Queries For Media : 
+
+
+1. List the number of pending cases.
+
+
+select count(cnr_no) as total_case_pending, extract(year from registration_date)
+ as year
+from cases where status = 'Pending'
+group by (extract(year from registration_date)) 
+        order by (extract(year from registration_date))
+
+
+2. List the name and experience of all the judges.
+
+
+(select distinct r.name, c.judge_exp, count(cnr_no) as number_of_cases_judged
+        from cases as c join related_people as r on c.judge_uid = r.uid 
+        group by (r.name, c.judge_exp))
+union        
+(select distinct p.name, j.judge_exp, count(i.cnr_no) as number_of_cases_judged
+        from interstate_cases as i join intcase_judges as j
+        on i.cnr_no = j.cnr_no join related_people as p
+        on p.uid = j.uid group by (p.name, j.judge_exp))
+
+
+3. List year wise the number of cases of each type registered in the year.
+
+
+select extract(year from registration_date) as year, 
+        c.type as case_type, count(c.type) as number_of_cases
+        from cases as c group by extract(year from registration_date), c.type 
+        order by extract(year from registration_date)
+
+
+4. List decade wise total number of cases.
+
+
+select decade, count as number_of_cases from ((select count(*),('1975-1984') as 
+decade from cases where 
+extract(year from registration_date) < 1984)
+Union
+(select count(*),('1985-1994') as decade from cases where extract(year from
+ registration_date) < 1994 and 
+extract(year from registration_date) > 1984) union
+(select count(*),('1995-2004') as decade from cases where extract(year from registration_date) < 2004 and 
+extract(year from registration_date) > 1994)
+union
+(select count(*),('2005-2014') as decade from cases where extract(year from 
+registration_date) < 2014 and 
+extract(year from registration_date) > 2004)
+ union
+(select count(*),('2015-2024') as decade from cases where extract(year from
+ registration_date) < 2024 and 
+extract(year from registration_date) > 2014)) as a;
+
+
+
+
+5. List of all lawyers with their success rate.
+select name,(case when sum = 0 then 0 else cast(sum as double 
+precision)/count end) as success_rate from 
+((select uid,count(uid),sum(case when verdict = 'Guilty' Then 1 else 0 end) 
+from p_lawyer_case natural join cases group by uid) union
+(select uid,count(uid),sum(case when verdict = 'Innocent' Then 1 else 0
+end) 
+         from r_lawyer_case natural join cases group by uid)) as a natural join
+related_people order by success_rate desc
+
+
+6. Find the total number of cases investigated by each investigating team, the average team size, and the total number of members in each team.
+
+
+SELECT it.department, COUNT(c.CNR_No) AS total_cases, AVG(it.team_size) 
+AS avg_team_size, COUNT(DISTINCT m.uid) AS total_members
+FROM investigating_team it
+JOIN case_investigated_by c ON it.ITID = c.ITID AND it.department = c.department
+JOIN member_of m ON it.ITID = m.ITID AND it.department = m.department
+GROUP BY it.department;
+
+
+7. Retrieve the name of courts along with their average number of cases registered per year for each court, sorted by court’s district in descending order.
+
+
+SELECT crt.CSR_No, crt.district, 
+              AVG(EXTRACT(YEAR FROM c.registration_date)) AS 
+avg_cases_per_year
+FROM courts crt
+LEFT JOIN cases c ON crt.CSR_No = c.CSR_No
+GROUP BY crt.CSR_No, crt.district
+ORDER BY crt.district DESC;
+
+
+8. Total number of hearings per month.
+
+
+        select extract(year from date) as year, extract(month from date) as month,
+        count(*) as number_of_hearings from hearings_cases
+        group by (extract(year from date), extract(month from date))
+        order by (extract(year from date), extract(month from date))
+
+
+9. Number of hearings per case type per year.
+ 
+SELECT EXTRACT(year from h.date) AS year, c.Type AS case_type,
+            COUNT(*) AS number_of_hearings
+        FROM hearings_cases as h INNER JOIN cases c ON h.CNR_No = 
+c.CNR_No
+        GROUP BY EXTRACT(year from h.date), c.Type
+            ORDER BY EXTRACT(year from h.date)
+ 
+10.  Identify the states with the highest and lowest number of registered cases along with the count of cases in each state.
+
+
+(SELECT state, total_cases_registered FROM (SELECT cos.state, COUNT(*) 
+AS total_cases_registered
+FROM court_state cos JOIN cases c ON cos.CSR_No = c.CSR_No GROUP BY cos.state) AS state_cases
+ORDER BY total_cases_registered DESC LIMIT 1)
+UNION ALL
+(SELECT state, total_cases_registered FROM (SELECT cos.state, COUNT(*) 
+AS total_cases_registered 
+FROM court_state cos JOIN cases c ON cos.CSR_No = c.CSR_No GROUP BY cos.state) AS state_cases
+ORDER BY total_cases_registered ASC LIMIT 1);
+
+
+
+
+
+
+
+
+
+
+
+
+Queries For Law Undergraduates  : 
+
+
+1. List state wise number of courts
+
+
+select s.state, count(c.csr_no) as number_of_courts 
+        from courts as c natural join court_state as s 
+        group by s.state
+
+
+2. Give a list for each state, year wise count of total number of cases registered
+
+
+select s.state, extract(year from c.registration_date) as year,  
+count(c.cnr_no) as number_of_cases
+        from cases as c join courts as ct on c.csr_no = ct.csr_no 
+        join court_state as s on ct.csr_no = s.csr_no
+        group by (s.state, extract(year from c.registration_date)) 
+        order by count(c.cnr_no) desc 
+
+
+3. List name and number of times a criminal has been proved guilty.
+
+
+Select r.name,count(c.verdict) as number from (related_people 
+natural join respondent) as r join cases as c on  r.cnr_no=c.cnr_no
+where verdict='Guilty' 
+group by r.name order by number desc;
+
+
+4. Give the number of times all the sections have been violated.
+
+
+        select section,count(section) as violation_count from section_violated
+ group by section order by violation_count desc
+
+
+5. List the court-level wise number of each case type and number of hearings.
+
+
+select a.type,a.case_count,a.level,b.hearings from ((select type,count(cnr_no) as case_count,'High' as level from cases where csr_no like '%00' and csr_no!= 'SC00' group by type) 
+union(select type,count(cnr_no) as case_count,'Supreme' as level from cases where csr_no= 'SC00' group by type) union
+(select type,count(cnr_no) as case_count,'District' as level from cases where csr_no not like '%00' group by type)) as a
+join
+((select type,count(cnr_no) as hearings,'High' as level from cases natural join hearings_cases where csr_no like '%00' and csr_no!= 'SC00' group by type) 
+union(select type,count(cnr_no) as count,'Supreme' as level from cases natural join hearings_cases where csr_no= 'SC00' group by type) union
+(select type,count(cnr_no) as count,'District' as level from cases natural join hearings_cases where csr_no not like '%00' group by type)) as b
+on a.type = b.type and a.level = b.level order by a.level
+
+
+6. Find the average number of cases investigated by each investigating team, grouped by department.
+
+
+select department,AVG(team_size) as average_case_inv
+from investigating_team group by  department;
+
+
+7. Identify 3 courts with highest number of pending cases
+
+
+select courts.csr_no, COUNT(*) as total_pending_cases
+from courts join cases on courts.csr_no = cases.csr_no
+where cases.status = 'Pending' group by courts.csr_no
+order by total_pending_cases desc limit 3;
+
+
+8. Give total number of cases with verdict guilty, innocent or pending
+
+
+        select * from ((select verdict,count(verdict) from cases 
+where status = 'Closed' group by verdict) union 
+(select 'Pending' as verdict,count(status) from cases 
+where status = 'Pending' group by status)) as a
+
+
+
+
+
+
+
+
+Queries for Judges :
+
+
+1. retrieves a list of judges, along with their experience, and the number of cases they have judged, considering both regular cases and interstate cases.
+
+(Select distinct r.name, c.judge_exp, count(cnr_no) as no_of_cases_judged from cases as c join related_people as r on c.judge_uid  = r.uid group by (r.name,c.judge_exp)) union (select distinct t.name, j.judge_exp, count(inte.cnr_no) as no_of_cases_judged from interstate_cases as inte join intcase_judges as j on inte.cnr_no = j.cnr_no join related_people as t on t.uid = j.uid group by (j.judge_exp,t.name))
+
+
+   2. Find the total number of cases heard in each court, along with the average experience of judges handling cases in each court and the total number of judges handling cases in each court.
+
+
+SELECT c.CSR_No, COUNT(hc.date) AS total_hearings, AVG(cs.judge_exp) AS avg_judge_exp, COUNT(DISTINCT r.uid) AS total_judges
+FROM courts c join cases cs on cs.CSR_No = c.CSR_No
+JOIN hearings_Cases hc ON cs.CNR_No = hc.CNR_No
+JOIN related_people r ON cs.Judge_UID = r.uid
+GROUP BY c.CSR_No;
+
+
+   3. Find the list of  judges along with their experiences and uid for all cases.
+
+
+select c.cnr_no,rp.name,c.judge_exp,rp.uid from cases c 
+join related_people rp on c.judge_uid = rp.uid
+join courts ct on c.csr_no = ct.csr_no
+
+
+   4. List the name of judges who have judged more than one case type along with the count of unique cases they have judged.
+
+
+SELECT r.name AS judge_name, COUNT(DISTINCT c.Type) AS unique_case_count
+FROM cases c JOIN related_people r ON c.Judge_UID = r.uid
+GROUP BY r.name HAVING COUNT(DISTINCT c.Type) > 1;
+
+
+   5. List the names of judges who have judged more than 10 years.
+
+
+SELECT r.name AS name, COUNT(*) AS num_cases_judged
+FROM cases c
+JOIN related_people r ON c.Judge_UID = r.uid
+GROUP BY r.name
+HAVING COUNT(*) > 10;
+
+
+
+
+
+
+
+
+
+
+Queries for General Public:
+
+
+
+
+   1. Find out distribution of case type(e.g criminal,civil) in the district along with total cases count of that type in each district.
+
+
+SELECT ct.district,c.Type AS type_of_case, COUNT(*) AS total_cases
+FROM cases c JOIN courts ct ON c.CSR_No = ct.CSR_No
+GROUP BY ct.district, c.Type ORDER BY ct.district, total_cases DESC;
+
+
+   2. List all the sections related to each type of crime.
+
+
+        select type,section from cases natural join section_violated 
+group by type,section order by type;
+
+
+
+
+   3. Show the different types of cases handled by female judges and how many cases of each type they have presided over.
+
+
+SELECT c.Type, COUNT(*) AS total_cases
+FROM cases c JOIN related_people r ON c.Judge_UID = r.uid
+WHERE r.gender = 'F' GROUP BY c.Type;
+
+
+
+
+   4. List all the cases investigated by teams of size at least 10.
+
+
+        select cnr_no,itid,team_size from cases natural join case_investigated_by 
+natural join investigating_team where team_size > 9 order by team_size
+
+
+   5. List the average number of team sizes of each department of investigation.
+
+
+select department,cast(avg(team_size) as int) from investigating_team group by department
+
+
+   6. Count the number of cases handled by male judges for each type handled by male judges with at least 15 years of experience.
+
+
+select c.Type,count(*) as total_cases
+from cases c join related_people rp on c.Judge_UID = rp.uid
+where  rp.gender = 'M' and c.Judge_Exp >= 15 group by c.Type;
+
+
+   7. List number of people accused of committing a crime per type per gender.
+
+
+select type,gender,count(type) from (cases natural join respondent) as a join related_people as b 
+on a.uid = b.uid group by type,gender order by type
+
+
+
+
+   8. List all the states grouped by states.
+
+
+           select court_state.state, courts.csr_no, courts.level, courts.district,
+courts.pincode from court_state join courts 
+on court_state.csr_no =courts.CSR_No order by court_state.state, courts.district;
+
+
+   9. List total number of members of each department of investigating teams.
+
+
+        select department,count(itid) from investigating_team 
+natural join case_investigated_by group by department

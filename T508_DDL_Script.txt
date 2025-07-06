@@ -1,0 +1,210 @@
+﻿DDL Script
+
+
+Group_No:-T508
+Kevin Shingala - 202201465
+Malay Sidapara - 202201488
+Shravan Makwana - 202201492
+Tushar Mori - 202201502
+Arnold Mochahari - 202201522
+
+
+
+
+CREATE SCHEMA INDIANJUDICIALRECORDS;
+
+
+set search_path to indianjudicialrecords;
+
+
+create table courts(
+CSR_No char(4) not NULL primary key,
+level varchar(15),
+district varchar(30),
+pincode INT
+);
+
+
+
+
+create table interstate_cases(
+CNR_No int not NULL primary key,
+state varchar(35),
+verdict varchar(50),
+dispute varchar(50),
+registration_date date,
+CSR_No char(10)   not null REFERENCES courts(CSR_No) 
+                on update cascade on delete set null
+);
+
+
+create table related_people(
+        uid int primary key not null,
+        name varchar(40),
+        gender varchar(2),
+        DOB date
+);
+
+
+create table cases(
+        CNR_No int not NULL primary key,
+        status varchar(15),
+        registration_date date,
+        Type varchar(20),
+        Verdict varchar(20),
+        CSR_No char(4)    not null REFERENCES courts(CSR_No) 
+                on update cascade on delete set null,
+        Judge_UID int   not null references related_people(uid)
+                on update cascade on delete set NULL,
+        Judge_Exp int
+);
+
+
+create table investigating_team(
+        ITID int not null,
+        department varchar(20) not null,
+        team_size int,
+        incharge_uid int   not null references related_people(uid)
+                on update cascade on delete set null,
+        primary key(ITID,department)
+);
+
+
+create table hearings_IntCases(
+        date date not null,
+        CNR_No int   not null references interstate_cases(CNR_No)
+                on update cascade on delete set null,
+        primary key(date,CNR_No)
+);
+
+
+create table hearings_Cases(
+        date date not null,
+        CNR_No int   not null references cases(CNR_No)
+                on update cascade on delete set null,
+        primary key(date,CNR_No)
+);
+
+
+create table court_state(
+        state varchar(20) not null,
+        CSR_No char(10)   not NULL references courts(CSR_No)
+                on update cascade on delete set null,
+        primary key(state,CSR_No)
+
+
+);
+
+
+create table p_lawyer_intcase(
+        CNR_No int   not null references interstate_cases(CNR_No)
+                on update cascade on delete set null,
+        uid int   not null references related_people(UID)
+                on update cascade on delete set null,
+        license_no varchar(10),
+        primary key(CNR_No,UID)
+);
+
+
+create table p_lawyer_case(
+        CNR_No int   not null references cases(CNR_No)
+                on update cascade on delete set null,
+        uid int   not null references related_people(UID)
+on update cascade on delete set null,
+        license_no varchar(10),
+        primary key(CNR_No,UID)
+);
+
+
+create table r_lawyer_case(
+        CNR_No int   not null references cases(CNR_No)
+                on update cascade on delete set null,
+        uid int    not null references related_people(UID)
+                on update cascade on delete set null,
+        license_no varchar(10),
+        primary key(CNR_No,UID)
+);
+
+
+create table r_lawyer_intcase(
+        CNR_No int    not null references interstate_cases(CNR_No)
+                on update cascade on delete set null,
+        uid int    not null references related_people(UID)
+                on update cascade on delete set null,
+        license_no varchar(10),
+        primary key(CNR_No,UID)
+);
+
+
+create table respondent(
+        CNR_No int    not null references cases(CNR_No)
+                on update cascade on delete set null,
+        uid int    not null references related_people(UID)
+                on update cascade on delete set null,
+        primary key(CNR_No,UID)
+);
+
+
+create table petitioner(
+        CNR_No int    not null references cases(CNR_No)
+on update cascade on delete set null,
+        uid int    not null references related_people(UID)
+                on update cascade on delete set null,
+        primary key(CNR_No,UID)
+                );
+
+
+create table section_violated(
+        CNR_No int    not null references cases(CNR_No)
+                on update cascade on delete set null,
+        section varchar(50),
+        primary key(CNR_No, section)
+);
+
+
+
+
+create table case_investigated_by(
+        ITID int not null,
+        department varchar(20) not null,
+        CNR_No int    not null references cases(CNR_No)
+                on update cascade on delete set null,
+        primary key(ITID, department, CNR_No),
+        foreign key (ITID, department) references
+investigating_team(ITID,department)
+on update cascade on delete set null
+);
+
+
+create table intcase_investigated_by(
+        ITID int not null,
+        department varchar(20) not null,
+        CNR_No int    not null references interstate_cases(CNR_No)
+                on update cascade on delete set null,
+        primary key(ITID, department, CNR_No),
+        foreign key (ITID, department) references
+investigating_team(ITID,department)
+on update cascade on delete set null
+);
+
+
+create table member_of(
+        ITID int not null,
+        department varchar(20) not null,
+        uid int    not null references related_people(uid)
+                on update cascade on delete set null,
+        foreign key (ITID, department) references
+         investigating_team(ITID,department)
+                on update cascade on delete set null,
+        primary key(ITID,department,uid)
+);
+
+
+create table intcase_judges(
+        CNR_No int    not null references interstate_cases(CNR_No)
+on update cascade on delete set null,
+        uid int    not null references related_people(uid)
+                on update cascade on delete set null,
+        judge_exp int,
+        primary key(CNR_No,uid)
+);
